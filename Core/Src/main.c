@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,7 +31,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define ADXL_SPI_READ	0x80
+#define ADXL_REG_ID		0x00
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -68,20 +69,36 @@ static void MX_TIM2_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
     if (htim->Instance == TIM2) // Check if the interrupt is from TIM2
     {
         // Toggle the D1 LED
         HAL_GPIO_TogglePin(D1_LED_GPIO_Port, D1_LED_Pin);
     }
+}
 
-    int _write(int file , char *ptr, int len){
-    	for(int i=0; i < len; i++){
-    		ITM_SendChar(*ptr++);
-    	}
-    	return len;
+int _write(int file , char *ptr, int len){
+	for(int i=0; i < len; i++){
+    	ITM_SendChar(*ptr++);
     }
+    return len;
+}
+
+uint8_t adxl_read_id(void){
+    uint8_t txData = ADXL_REG_ID | ADXL_SPI_READ;
+    uint8_t id = 0;
+
+    // set cs low
+    HAL_GPIO_WritePin(ADXL_CS_GPIO_Port, ADXL_CS_Pin, GPIO_PIN_RESET);
+
+    // read device id
+    HAL_SPI_Transmit(&hspi2, &txData, 1, HAL_MAX_DELAY);
+    HAL_SPI_Receive(&hspi2, &id, 1, HAL_MAX_DELAY);
+
+    // set cs high
+    HAL_GPIO_WritePin(ADXL_CS_GPIO_Port, ADXL_CS_Pin, GPIO_PIN_SET);
+
+    return id;
 }
 
 /* USER CODE END 0 */
@@ -132,6 +149,9 @@ int main(void)
   {
 	  printf("SWO Test\r\n");
 	  HAL_Delay(500);
+
+	  uint8_t adxl_id = adxl_read_id();
+	  printf("ADXL ID: %hhu\r\n", adxl_id);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
