@@ -31,8 +31,15 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+// ADXL375 Defines
 #define ADXL_SPI_READ	0x80
 #define ADXL_REG_ID		0x00
+#define ADXL_ACCEL_REG 0x32
+#define ADXL_MULTI_BYTE_READ 0x40
+
+// MS5611 Defines
+#define 
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -69,6 +76,20 @@ static void MX_TIM2_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+// NOTE: could be half precision floats to save space
+typedef struct{
+	float x;
+	float y;
+	float z;
+
+} accel_data;
+
+typedef struct{
+	float x;
+	float y;
+	float z;
+} gyro_data;
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
     if (htim->Instance == TIM2) // Check if the interrupt is from TIM2
     {
@@ -100,6 +121,32 @@ uint8_t adxl_read_id(void){
 
     return id;
 }
+
+accel_data adxl_read_accel(void){
+
+	accel_data data;
+    uint8_t txData = ADXL_ACCEL_REG | ADXL_SPI_READ | ADXL_MULTI_BYTE_READ;
+    uint8_t rxData[6];
+
+    // set cs low
+    HAL_GPIO_WritePin(ADXL_CS_GPIO_Port, ADXL_CS_Pin, GPIO_PIN_RESET);
+
+    // read acceleration data
+    HAL_SPI_Transmit(&hspi2, &txData, 1, HAL_MAX_DELAY);
+    HAL_SPI_Receive(&hspi2, rxData, 6, HAL_MAX_DELAY);
+
+    // set cs high
+    HAL_GPIO_WritePin(ADXL_CS_GPIO_Port, ADXL_CS_Pin, GPIO_PIN_SET);
+
+    // Convert the raw data to float values
+    data.x = (int16_t)((rxData[1] << 8) | rxData[0]) * 0.001f;
+    data.y = (int16_t)((rxData[3] << 8) | rxData[2]) * 0.001f;
+    data.z = (int16_t)((rxData[5] << 8) | rxData[4]) * 0.001f;
+
+    return data;
+
+}
+
 
 /* USER CODE END 0 */
 
