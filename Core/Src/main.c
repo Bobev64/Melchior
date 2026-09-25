@@ -39,7 +39,6 @@
 #define ADXL_MULTI_BYTE_READ 0x40
 
 // MS5611 Defines
-#define 
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -75,6 +74,12 @@ static void MX_TIM2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+int _write(int file , char *ptr, int len){
+	for(int i=0; i < len; i++){
+		ITM_SendChar(*ptr++);
+	}
+	return len;
+}
 
 // NOTE: could be half precision floats to save space
 typedef struct{
@@ -98,30 +103,25 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
     }
 }
 
-int _write(int file , char *ptr, int len){
-	for(int i=0; i < len; i++){
-    	ITM_SendChar(*ptr++);
-    }
-    return len;
-}
-
 uint8_t adxl_read_id(void){
-    uint8_t txData = ADXL_REG_ID | ADXL_SPI_READ;
-    uint8_t id = 0;
+    // txData[0]: Read bit (0x80) | Register address (0x00)
+    // txData[1]: Dummy byte to keep the clock running while receiving
+    uint8_t txData[2] = {0x80, 0x00};
+    uint8_t rxData[2] = {0, 0};
 
     // set cs low
     HAL_GPIO_WritePin(ADXL_CS_GPIO_Port, ADXL_CS_Pin, GPIO_PIN_RESET);
 
-    // read device id
-    HAL_SPI_Transmit(&hspi2, &txData, 1, HAL_MAX_DELAY);
-    HAL_SPI_Receive(&hspi2, &id, 1, HAL_MAX_DELAY);
+    // transmit address and receive data simultaneously over 2 bytes
+    HAL_SPI_TransmitReceive(&hspi2, txData, rxData, 2, HAL_MAX_DELAY);
 
     // set cs high
     HAL_GPIO_WritePin(ADXL_CS_GPIO_Port, ADXL_CS_Pin, GPIO_PIN_SET);
 
-    return id;
+    // rxData[0] is garbage received during the address transmission
+    // rxData[1] is the actual device ID received during the dummy byte transmission
+    return rxData[1];
 }
-
 accel_data adxl_read_accel(void){
 
 	accel_data data;
@@ -194,11 +194,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  printf("SWO Test\r\n");
 	  HAL_Delay(500);
-
 	  uint8_t adxl_id = adxl_read_id();
-	  printf("ADXL ID: %hhu\r\n", adxl_id);
+	  printf("ADXL ID: %x\r\n", adxl_id);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -435,7 +433,7 @@ static void MX_SPI2_Init(void)
   hspi2.Instance = SPI2;
   hspi2.Init.Mode = SPI_MODE_MASTER;
   hspi2.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi2.Init.DataSize = SPI_DATASIZE_4BIT;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi2.Init.CLKPolarity = SPI_POLARITY_HIGH;
   hspi2.Init.CLKPhase = SPI_PHASE_2EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
