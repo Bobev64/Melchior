@@ -122,6 +122,47 @@ uint8_t adxl_read_id(void){
     // rxData[1] is the actual device ID received during the dummy byte transmission
     return rxData[1];
 }
+
+uint8_t asm330lhhx_read_id(void){
+    // txData[0]: Read bit (0x80) | WHO_AM_I Register (0x0F)
+    uint8_t txData[2] = {0x8F, 0x00};
+    uint8_t rxData[2] = {0, 0};
+
+    HAL_GPIO_WritePin(ASM330_CS_GPIO_Port, ASM330_CS_Pin, GPIO_PIN_RESET);
+    HAL_SPI_TransmitReceive(&hspi2, txData, rxData, 2, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(ASM330_CS_GPIO_Port, ASM330_CS_Pin, GPIO_PIN_SET);
+
+    return rxData[1];
+}
+
+uint16_t ms5611_read_prom_word0(void){
+    // txData[0]: PROM Read Command for Word 0 (0xA0)
+    // txData[1-2]: Dummy bytes to keep the clock running for the 16-bit response
+    uint8_t txData[3] = {0xA0, 0x00, 0x00};
+    uint8_t rxData[3] = {0, 0, 0};
+
+    HAL_GPIO_WritePin(MS5611_CS_GPIO_Port, MS5611_CS_Pin, GPIO_PIN_RESET);
+    HAL_SPI_TransmitReceive(&hspi2, txData, rxData, 3, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(MS5611_CS_GPIO_Port, MS5611_CS_Pin, GPIO_PIN_SET);
+
+    // Combine the two data bytes (MSB first).
+    // rxData[0] is garbage received during the command transmission.
+    return (uint16_t)(rxData[1] << 8 | rxData[2]);
+}
+
+uint8_t mmc5983_read_id(void){
+    // txData[0]: Read bit (0x80) | Product ID Register (0x2F)
+    uint8_t txData[2] = {0xAF, 0x00};
+    uint8_t rxData[2] = {0, 0};
+
+    HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_RESET);
+    HAL_SPI_TransmitReceive(&hspi2, txData, rxData, 2, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_SET);
+
+    return rxData[1];
+}
+
+
 accel_data adxl_read_accel(void){
 
 	accel_data data;
@@ -147,6 +188,14 @@ accel_data adxl_read_accel(void){
 
 }
 
+void ms5611_reset(void) {
+    uint8_t cmd = 0x1E; // Reset command
+    HAL_GPIO_WritePin(MS5611_CS_GPIO_Port, MS5611_CS_Pin, GPIO_PIN_RESET);
+    HAL_SPI_Transmit(&hspi2, &cmd, 1, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(MS5611_CS_GPIO_Port, MS5611_CS_Pin, GPIO_PIN_SET);
+    HAL_Delay(10); // Wait for PROM reload (min 2.8ms required by datasheet)
+}
+
 
 /* USER CODE END 0 */
 
@@ -158,7 +207,10 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+	HAL_GPIO_WritePin(ASM330_CS_GPIO_Port, ASM330_CS_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(MS5611_CS_GPIO_Port, MS5611_CS_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_SET);
+	HAL_Delay(20); // Allow sensors to complete internal POR with CS high
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -195,8 +247,14 @@ int main(void)
   while (1)
   {
 	  HAL_Delay(500);
-	  uint8_t adxl_id = adxl_read_id();
-	  printf("ADXL ID: %x\r\n", adxl_id);
+	  // uint8_t adxl_id = adxl_read_id();
+	  uint8_t mmc_id = mmc5983_read_id();
+	  uint8_t asm_id = asm330lhhx_read_id();
+	  ms5611_reset();
+	  uint16_t ms_prom0 = ms5611_read_prom_word0();
+	  printf("mmc id: %x\r\n", mmc_id);
+	  printf("asm id: %x\r\n", asm_id);
+	  printf("ms prom0: %x\r\n", ms_prom0);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -434,15 +492,15 @@ static void MX_SPI2_Init(void)
   hspi2.Init.Mode = SPI_MODE_MASTER;
   hspi2.Init.Direction = SPI_DIRECTION_2LINES;
   hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi2.Init.CLKPolarity = SPI_POLARITY_HIGH;
-  hspi2.Init.CLKPhase = SPI_PHASE_2EDGE;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
   hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
   hspi2.Init.CRCPolynomial = 0x7;
-  hspi2.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  hspi2.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
   hspi2.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
   hspi2.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
   hspi2.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
