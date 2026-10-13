@@ -1,0 +1,14 @@
+../Core/Src/asm330lhhx.c:20:13:ASM330LHHX_Select	1
+../Core/Src/asm330lhhx.c:25:13:ASM330LHHX_Deselect	1
+../Core/Src/asm330lhhx.c:30:16:ASM330LHHX_Int16FromLe	1
+../Core/Src/asm330lhhx.c:35:14:ASM330LHHX_AccelSensitivityMg	5
+../Core/Src/asm330lhhx.c:46:14:ASM330LHHX_GyroSensitivityMdps	7
+../Core/Src/asm330lhhx.c:59:6:ASM330LHHX_AssignSPI	3
+../Core/Src/asm330lhhx.c:81:19:ASM330LHHX_ReadRegister	7
+../Core/Src/asm330lhhx.c:100:19:ASM330LHHX_WriteRegister	4
+../Core/Src/asm330lhhx.c:115:19:ASM330LHHX_Init	6
+../Core/Src/asm330lhhx.c:159:19:ASM330LHHX_ReadDeviceID	1
+../Core/Src/asm330lhhx.c:164:19:ASM330LHHX_ReadAccelRaw	3
+../Core/Src/asm330lhhx.c:183:19:ASM330LHHX_ReadGyroRaw	3
+../Core/Src/asm330lhhx.c:202:19:ASM330LHHX_ReadAccelMg	3
+../Core/Src/asm330lhhx.c:221:19:ASM330LHHX_ReadGyroMdps	3

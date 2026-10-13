@@ -22,6 +22,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include "asm330lhhx.h"
+#include "ms5611.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,7 +59,16 @@ SPI_HandleTypeDef hspi2;
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
-
+static ASM330LHHX_t asm330;
+static uint8_t asm330_ready = 0U;
+static MS5611_t ms5611;
+/* User-selectable MS5611 settings. Copied to ms5611.config at startup. */
+static MS5611_Config_t ms5611_config = {
+    .pressure_osr = MS5611_OSR_4096,
+    .temperature_osr = MS5611_OSR_4096,
+    .spi_timeout_ms = 100U,
+    .second_order_compensation = true
+};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -135,21 +146,6 @@ uint8_t asm330lhhx_read_id(void){
     return rxData[1];
 }
 
-uint16_t ms5611_read_prom_word0(void){
-    // txData[0]: PROM Read Command for Word 0 (0xA0)
-    // txData[1-2]: Dummy bytes to keep the clock running for the 16-bit response
-    uint8_t txData[3] = {0xA0, 0x00, 0x00};
-    uint8_t rxData[3] = {0, 0, 0};
-
-    HAL_GPIO_WritePin(MS5611_CS_GPIO_Port, MS5611_CS_Pin, GPIO_PIN_RESET);
-    HAL_SPI_TransmitReceive(&hspi2, txData, rxData, 3, HAL_MAX_DELAY);
-    HAL_GPIO_WritePin(MS5611_CS_GPIO_Port, MS5611_CS_Pin, GPIO_PIN_SET);
-
-    // Combine the two data bytes (MSB first).
-    // rxData[0] is garbage received during the command transmission.
-    return (uint16_t)(rxData[1] << 8 | rxData[2]);
-}
-
 uint8_t mmc5983_read_id(void){
     // txData[0]: Read bit (0x80) | Product ID Register (0x2F)
     uint8_t txData[2] = {0xAF, 0x00};
@@ -188,12 +184,25 @@ accel_data adxl_read_accel(void){
 
 }
 
-void ms5611_reset(void) {
-    uint8_t cmd = 0x1E; // Reset command
-    HAL_GPIO_WritePin(MS5611_CS_GPIO_Port, MS5611_CS_Pin, GPIO_PIN_RESET);
-    HAL_SPI_Transmit(&hspi2, &cmd, 1, HAL_MAX_DELAY);
-    HAL_GPIO_WritePin(MS5611_CS_GPIO_Port, MS5611_CS_Pin, GPIO_PIN_SET);
-    HAL_Delay(10); // Wait for PROM reload (min 2.8ms required by datasheet)
+/* Fixed-point printing retains two decimal places, including -0.xx,
+   without enabling floating-point printf in newlib-nano. */
+static void print_hundredths(int32_t value)
+{
+    unsigned long magnitude = (unsigned long)(value < 0 ? -(int64_t)value : value);
+    printf("%s%lu.%02lu", value < 0 ? "-" : "", magnitude / 100UL, magnitude % 100UL);
+}
+
+static void ms5611_calculation_self_test(void)
+{
+    /* Published datasheet example (page 8); this tests math, not the wiring. */
+    const uint16_t example_prom[8] = { 0U, 40127U, 36924U, 23317U,
+                                      23282U, 33464U, 28312U, 0U };
+    MS5611_Data_t example;
+    MS5611_Status_t status = MS5611_Compensate(example_prom, 9085466U, 8569150U,
+                                              true, &example);
+    printf("MS5611 datasheet calculation self-test: %s (expected 1000.09 mbar, 20.07 C)\r\n",
+           status == MS5611_OK && example.pressure_centi_mbar == 100009 &&
+           example.temperature_centi_c == 2007 ? "PASS" : "FAIL");
 }
 
 
@@ -207,10 +216,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-	HAL_GPIO_WritePin(ASM330_CS_GPIO_Port, ASM330_CS_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(MS5611_CS_GPIO_Port, MS5611_CS_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_SET);
-	HAL_Delay(20); // Allow sensors to complete internal POR with CS high
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -240,21 +245,95 @@ int main(void)
 
   HAL_TIM_Base_Start_IT(&htim2); // Start the timer with interrupt
 
+  /* Keep all other devices off the shared SPI bus. */
+  HAL_GPIO_WritePin(ADXL_CS_GPIO_Port, ADXL_CS_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(MS5611_CS_GPIO_Port, MS5611_CS_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_SET);
+  ASM330LHHX_AssignSPI(&asm330, &hspi2, ASM330_CS_GPIO_Port, ASM330_CS_Pin);
+  HAL_Delay(20U); // Allow sensor power-on reset to complete.
+  setvbuf(stdout, NULL, _IONBF, 0); // Send printf output directly to ITM port 0.
+
+  uint8_t asm_id = 0U;
+  HAL_StatusTypeDef asm_status = ASM330LHHX_ReadDeviceID(&asm330, &asm_id);
+  printf("ASM330LHHX WHO_AM_I: 0x%02X (expected 0x%02X), HAL status: %u\r\n",
+         (unsigned int)asm_id, (unsigned int)ASM330LHHX_WHO_AM_I_VALUE,
+         (unsigned int)asm_status);
+
+  if ((asm_status == HAL_OK) && (asm_id == ASM330LHHX_WHO_AM_I_VALUE)) {
+    asm_status = ASM330LHHX_Init(&asm330,
+                                ASM330LHHX_ODR_104HZ, ASM330LHHX_XL_FS_2G,
+                                ASM330LHHX_ODR_104HZ, ASM330LHHX_G_FS_250DPS);
+    if (asm_status == HAL_OK) {
+      asm330_ready = 1U;
+      printf("ASM330LHHX initialized: 104 Hz, +/-2 g, +/-250 dps\r\n");
+    } else {
+      printf("ASM330LHHX initialization failed, HAL status: %u\r\n",
+             (unsigned int)asm_status);
+    }
+  } else {
+    printf("ASM330LHHX not detected; check wiring and SPI configuration.\r\n");
+  }
+
+  ms5611_calculation_self_test();
+  MS5611_AssignSPI(&ms5611, &hspi2, MS5611_CS_GPIO_Port, MS5611_CS_Pin);
+  ms5611.config = ms5611_config;
+  MS5611_Status_t ms_status = MS5611_Init(&ms5611);
+  if (ms_status == MS5611_OK) {
+    printf("MS5611 initialized, PROM CRC OK; pressure OSR=%u, temperature OSR=%u\r\n",
+           256U << ((unsigned int)ms5611.config.pressure_osr / 2U),
+           256U << ((unsigned int)ms5611.config.temperature_osr / 2U));
+    for (unsigned int i = 1U; i <= 6U; ++i) {
+      printf("MS5611 C%u=%u\r\n", i, (unsigned int)ms5611.prom[i]);
+    }
+  } else {
+    printf("MS5611 init failed: status=%u, HAL=%u (check PS low, CS and wiring)\r\n",
+           (unsigned int)ms_status, (unsigned int)ms5611.last_hal_status);
+  }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_Delay(500);
-	  // uint8_t adxl_id = adxl_read_id();
-	  uint8_t mmc_id = mmc5983_read_id();
-	  uint8_t asm_id = asm330lhhx_read_id();
-	  ms5611_reset();
-	  uint16_t ms_prom0 = ms5611_read_prom_word0();
-	  printf("mmc id: %x\r\n", mmc_id);
-	  printf("asm id: %x\r\n", asm_id);
-	  printf("ms prom0: %x\r\n", ms_prom0);
+    HAL_Delay(500U);
+    if (asm330_ready) {
+      ASM330LHHX_FloatData_t accel_mg;
+      ASM330LHHX_FloatData_t gyro_mdps;
+      HAL_StatusTypeDef accel_status = ASM330LHHX_ReadAccelMg(&asm330, &accel_mg);
+      HAL_StatusTypeDef gyro_status = ASM330LHHX_ReadGyroMdps(&asm330, &gyro_mdps);
+
+      /* Integer output avoids requiring newlib-nano float printf support.
+         1000 mg = 1 g; 1000 mdps = 1 degree/second. */
+      if (accel_status == HAL_OK) {
+        printf("Accel [mg]: X=%ld Y=%ld Z=%ld\r\n",
+               (long)accel_mg.x, (long)accel_mg.y, (long)accel_mg.z);
+      } else {
+        printf("Accel read failed, HAL status: %u\r\n", (unsigned int)accel_status);
+      }
+      if (gyro_status == HAL_OK) {
+        printf("Gyro [mdps]: X=%ld Y=%ld Z=%ld\r\n",
+               (long)gyro_mdps.x, (long)gyro_mdps.y, (long)gyro_mdps.z);
+      } else {
+        printf("Gyro read failed, HAL status: %u\r\n", (unsigned int)gyro_status);
+      }
+    }
+    if (ms5611.initialized) {
+      MS5611_Data_t barometer;
+      MS5611_Status_t status = MS5611_Read(&ms5611, &barometer);
+      if (status == MS5611_OK) {
+        printf("MS5611 pressure: ");
+        print_hundredths(barometer.pressure_centi_mbar);
+        printf(" mbar, temperature: ");
+        print_hundredths(barometer.temperature_centi_c);
+        printf(" C (D1=%lu, D2=%lu)\r\n",
+               (unsigned long)barometer.raw_pressure,
+               (unsigned long)barometer.raw_temperature);
+      } else {
+        printf("MS5611 read failed: status=%u, HAL=%u\r\n",
+               (unsigned int)status, (unsigned int)ms5611.last_hal_status);
+      }
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -515,7 +594,14 @@ static void MX_SPI2_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN SPI2_Init 2 */
-
+  /* Use SPI mode 0. /32 keeps SCK below the 10 MHz limit even with
+     a 250 MHz peripheral clock. */
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK) {
+    Error_Handler();
+  }
   /* USER CODE END SPI2_Init 2 */
 
 }

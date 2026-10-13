@@ -1,0 +1,10 @@
+../Core/Src/ms5611.c:10:13:valid_osr	6
+../Core/Src/ms5611.c:17:13:valid_device	9
+../Core/Src/ms5611.c:27:24:transfer	3
+../Core/Src/ms5611.c:46:6:MS5611_AssignSPI	4
+../Core/Src/ms5611.c:61:9:MS5611_CalculateCRC4	7
+../Core/Src/ms5611.c:84:13:valid_coefficients	4
+../Core/Src/ms5611.c:94:17:MS5611_Init	8
+../Core/Src/ms5611.c:123:24:convert	5
+../Core/Src/ms5611.c:143:17:MS5611_Compensate	18
+../Core/Src/ms5611.c:183:17:MS5611_Read	6
