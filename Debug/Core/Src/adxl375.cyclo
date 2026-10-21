@@ -1,0 +1,9 @@
+../Core/Src/adxl375.c:4:13:valid	15
+../Core/Src/adxl375.c:17:25:transfer	2
+../Core/Src/adxl375.c:30:25:read_regs	8
+../Core/Src/adxl375.c:44:25:write_reg	1
+../Core/Src/adxl375.c:50:6:ADXL375_AssignSPI	4
+../Core/Src/adxl375.c:59:18:ADXL375_ReadStatus	5
+../Core/Src/adxl375.c:74:18:ADXL375_Init	14
+../Core/Src/adxl375.c:109:16:signed_le	1
+../Core/Src/adxl375.c:115:18:ADXL375_Read	8

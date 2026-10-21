@@ -1,0 +1,15 @@
+../Core/Src/mmc5983.c:22:13:valid_device	10
+../Core/Src/mmc5983.c:31:25:transfer	2
+../Core/Src/mmc5983.c:42:25:read_registers	3
+../Core/Src/mmc5983.c:56:25:write_register	1
+../Core/Src/mmc5983.c:63:25:wait_ready	4
+../Core/Src/mmc5983.c:83:6:MMC5983_AssignSPI	4
+../Core/Src/mmc5983.c:98:18:MMC5983_ReadDeviceID	3
+../Core/Src/mmc5983.c:106:18:MMC5983_Init	13
+../Core/Src/mmc5983.c:156:25:trigger	3
+../Core/Src/mmc5983.c:168:13:convert_axis	2
+../Core/Src/mmc5983.c:177:18:MMC5983_ReadMagnetic	12
+../Core/Src/mmc5983.c:208:18:MMC5983_ReadTemperature	6
+../Core/Src/mmc5983.c:233:25:condition	4
+../Core/Src/mmc5983.c:248:18:MMC5983_Set	1
+../Core/Src/mmc5983.c:253:18:MMC5983_Reset	1
