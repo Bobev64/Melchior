@@ -1,7 +1,5 @@
-"./Core/Src/adxl375.o"
 "./Core/Src/asm330lhhx.o"
 "./Core/Src/main.o"
-"./Core/Src/mmc5983.o"
 "./Core/Src/ms5611.o"
 "./Core/Src/stm32h5xx_hal_msp.o"
 "./Core/Src/stm32h5xx_it.o"

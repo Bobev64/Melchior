@@ -7,6 +7,7 @@ extern "C" {
 
 #include "stm32h5xx_hal.h"
 #include <stdint.h>
+#include <stdbool.h>
 
 #define ASM330LHHX_WHO_AM_I_VALUE 0x6BU
 
@@ -40,24 +41,35 @@ typedef enum {
 
 typedef enum {
     ASM330LHHX_ODR_POWER_DOWN = 0x00U,
-    ASM330LHHX_ODR_12_5HZ     = 0x10U,
-    ASM330LHHX_ODR_26HZ       = 0x20U,
-    ASM330LHHX_ODR_52HZ       = 0x30U,
-    ASM330LHHX_ODR_104HZ      = 0x40U,
-    ASM330LHHX_ODR_208HZ      = 0x50U,
-    ASM330LHHX_ODR_416HZ      = 0x60U,
-    ASM330LHHX_ODR_833HZ      = 0x70U,
-    ASM330LHHX_ODR_1667HZ     = 0x80U,
-    ASM330LHHX_ODR_3333HZ     = 0x90U,
-    ASM330LHHX_ODR_6667HZ     = 0xA0U
+    ASM330LHHX_ODR_12_5     = 0x10U,
+    ASM330LHHX_ODR_26       = 0x20U,
+    ASM330LHHX_ODR_52       = 0x30U,
+    ASM330LHHX_ODR_104      = 0x40U,
+    ASM330LHHX_ODR_208      = 0x50U,
+    ASM330LHHX_ODR_416      = 0x60U,
+    ASM330LHHX_ODR_833      = 0x70U,
+    ASM330LHHX_ODR_1667     = 0x80U,
+    ASM330LHHX_ODR_3333     = 0x90U,
+    ASM330LHHX_ODR_6667     = 0xA0U
 } ASM330LHHX_Odr_t;
+
+typedef struct {
+    ASM330LHHX_Odr_t accel_odr;
+    ASM330LHHX_AccelFullScale_t accel_fs;
+    ASM330LHHX_Odr_t gyro_odr;
+    ASM330LHHX_GyroFullScale_t gyro_fs;
+    uint32_t spi_timeout_ms;
+} ASM330LHHX_Config_t;
+
+#define ASM330LHHX_CONFIG_DEFAULT { ASM330LHHX_ODR_104, ASM330LHHX_XL_FS_2G, \
+                                   ASM330LHHX_ODR_104, ASM330LHHX_G_FS_250DPS, 100U }
 
 typedef struct {
     SPI_HandleTypeDef *hspi;
     GPIO_TypeDef *cs_port;
     uint16_t cs_pin;
-    ASM330LHHX_AccelFullScale_t accel_fs;
-    ASM330LHHX_GyroFullScale_t gyro_fs;
+    ASM330LHHX_Config_t config; /* Driver-owned copy; reinitialize to change. */
+    bool initialized;
     float accel_mg_per_lsb;
     float gyro_mdps_per_lsb;
 } ASM330LHHX_t;
@@ -67,11 +79,10 @@ void ASM330LHHX_AssignSPI(ASM330LHHX_t *dev,
                           GPIO_TypeDef *cs_port,
                           uint16_t cs_pin);
 
-HAL_StatusTypeDef ASM330LHHX_Init(ASM330LHHX_t *dev,
-                                  ASM330LHHX_Odr_t accel_odr,
-                                  ASM330LHHX_AccelFullScale_t accel_fs,
-                                  ASM330LHHX_Odr_t gyro_odr,
-                                  ASM330LHHX_GyroFullScale_t gyro_fs);
+/* Non-null config is validated and copied; no caller-owned pointer is kept.
+   Init must succeed before reading measurements. ID/register access is allowed
+   after AssignSPI. Failed initialization clears initialized. */
+HAL_StatusTypeDef ASM330LHHX_Init(ASM330LHHX_t *dev, const ASM330LHHX_Config_t *config);
 
 HAL_StatusTypeDef ASM330LHHX_ReadDeviceID(ASM330LHHX_t *dev, uint8_t *device_id);
 HAL_StatusTypeDef ASM330LHHX_ReadAccelRaw(ASM330LHHX_t *dev, ASM330LHHX_RawData_t *accel);

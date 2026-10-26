@@ -50,7 +50,7 @@ typedef struct {
     SPI_HandleTypeDef *hspi;
     GPIO_TypeDef *cs_port;
     uint16_t cs_pin;
-    /* May be changed between reads. Do not change during a read. */
+    /* Driver-owned copy; reinitialize to change configuration. */
     MS5611_Config_t config;
     /* Read-only diagnostics after initialization: words 1..6 are C1..C6. */
     uint16_t prom[8];
@@ -65,8 +65,9 @@ void MS5611_AssignSPI(MS5611_t *dev, SPI_HandleTypeDef *hspi,
                       GPIO_TypeDef *cs_port, uint16_t cs_pin);
 
 /* Reset, wait for PROM reload, read all eight words, validate CRC-4.
-   There is no WHO_AM_I register on this sensor. */
-MS5611_Status_t MS5611_Init(MS5611_t *dev);
+   There is no WHO_AM_I register on this sensor. Non-null config is validated
+   and copied; no caller-owned pointer is retained. Failed init clears initialized. */
+MS5611_Status_t MS5611_Init(MS5611_t *dev, const MS5611_Config_t *config);
 
 /* Blocking D1 and D2 conversions, then calibrated pressure/temperature.
    Takes about 20 ms at OSR 4096. Output is unchanged on failure.

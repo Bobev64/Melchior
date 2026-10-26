@@ -91,11 +91,19 @@ static bool valid_coefficients(const uint16_t prom[8])
     return true;
 }
 
-MS5611_Status_t MS5611_Init(MS5611_t *dev)
+MS5611_Status_t MS5611_Init(MS5611_t *dev, const MS5611_Config_t *config)
 {
     if (dev != NULL) {
         dev->initialized = false;
     }
+    if (dev == NULL || config == NULL) {
+        return MS5611_ERROR_ARGUMENT;
+    }
+    if (!valid_osr(config->pressure_osr) || !valid_osr(config->temperature_osr) ||
+        config->spi_timeout_ms == 0U || config->spi_timeout_ms == UINT32_MAX) {
+        return MS5611_ERROR_ARGUMENT;
+    }
+    dev->config = *config;
     if (!valid_device(dev)) {
         return MS5611_ERROR_ARGUMENT;
     }

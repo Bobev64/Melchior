@@ -19,7 +19,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # Set the project name
-set(CMAKE_PROJECT_NAME Bare Minimum)
+set(CMAKE_PROJECT_NAME Melchior)
 
 
 # Enable compile command to ease indexing with e.g. clangd
@@ -48,8 +48,6 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Core/Src/asm330lhhx.c
     Core/Src/ms5611.c
-    Core/Src/mmc5983.c
-    Core/Src/adxl375.c
 )
 
 # Add include paths

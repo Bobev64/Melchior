@@ -18,6 +18,8 @@ typedef enum { GPIO_PIN_RESET = 0, GPIO_PIN_SET } GPIO_PinState;
 void HAL_GPIO_WritePin(GPIO_TypeDef *port, uint16_t pin, GPIO_PinState state);
 void HAL_Delay(uint32_t milliseconds);
 uint32_t HAL_GetTick(void);
+HAL_StatusTypeDef HAL_SPI_Transmit(SPI_HandleTypeDef *spi, uint8_t *data, uint16_t size, uint32_t timeout);
+HAL_StatusTypeDef HAL_SPI_Receive(SPI_HandleTypeDef *spi, uint8_t *data, uint16_t size, uint32_t timeout);
 HAL_StatusTypeDef HAL_SPI_TransmitReceive(SPI_HandleTypeDef *spi, uint8_t *tx,
                                          uint8_t *rx, uint16_t size, uint32_t timeout);
 #endif

@@ -73,7 +73,11 @@ int main(void)
     prom[7] = MS5611_CalculateCRC4(prom);
     uint16_t original[8];
     memcpy(original, prom, sizeof(prom));
-    assert(MS5611_Init(&dev) == MS5611_OK);
+    MS5611_Config_t config = MS5611_CONFIG_DEFAULT;
+    assert(MS5611_Init(&dev, NULL) == MS5611_ERROR_ARGUMENT);
+    assert(MS5611_Init(&dev, &config) == MS5611_OK);
+    config.spi_timeout_ms = 5U; // Init owns a copy, not a pointer to config.
+    assert(dev.config.spi_timeout_ms == 100U);
     assert(memcmp(original, prom, sizeof(prom)) == 0);
     assert(MS5611_Read(&dev, &data) == MS5611_OK);
     assert(data.pressure_centi_mbar == 100009 && data.temperature_centi_c == 2007);
@@ -112,12 +116,18 @@ int main(void)
     dev.config.pressure_osr = MS5611_OSR_4096;
     assert(MS5611_Read(NULL, &data) == MS5611_ERROR_ARGUMENT);
     assert(MS5611_Read(&dev, NULL) == MS5611_ERROR_ARGUMENT);
+    config = (MS5611_Config_t)MS5611_CONFIG_DEFAULT;
+    config.pressure_osr = (MS5611_Osr_t)3;
+    previous_transfers = transfers;
+    assert(MS5611_Init(&dev, &config) == MS5611_ERROR_ARGUMENT && !dev.initialized);
+    assert(transfers == previous_transfers);
+    config = (MS5611_Config_t)MS5611_CONFIG_DEFAULT;
     prom[1] ^= 1U;
-    assert(MS5611_Init(&dev) == MS5611_ERROR_PROM && !dev.initialized);
+    assert(MS5611_Init(&dev, &config) == MS5611_ERROR_PROM && !dev.initialized);
     memset(prom, 0, sizeof(prom));
-    assert(MS5611_Init(&dev) == MS5611_ERROR_PROM);
+    assert(MS5611_Init(&dev, &config) == MS5611_ERROR_PROM);
     memset(prom, 0xFF, sizeof(prom));
-    assert(MS5611_Init(&dev) == MS5611_ERROR_PROM);
+    assert(MS5611_Init(&dev, &config) == MS5611_ERROR_PROM);
     puts("MS5611 tests passed: compensation, CRC, OSR delays, SPI errors, invalid data/config.");
     return 0;
 }

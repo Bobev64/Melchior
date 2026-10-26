@@ -38,9 +38,10 @@ Edit `ms5611_config` in the `USER CODE BEGIN PV` block in `main.c`:
 - `second_order_compensation`: default `true`; applies the datasheet's extra
   compensation below 20 C, including the extra correction below -15 C.
 
-After `MS5611_AssignSPI`, settings can also be changed directly through
-`dev.config` between calls to `MS5611_Read`. `AssignSPI` installs defaults;
-set custom configuration **after** that call. The sample defaults use OSR 4096
+After `MS5611_AssignSPI`, pass settings to `MS5611_Init(&dev, &config)`.
+Initialization copies the config; change the caller's config and reinitialize
+to apply updates. Treat `dev.config` as driver-owned state.
+The sample defaults use OSR 4096
 for both conversions and take roughly 20 ms per reading. Reads are blocking and
 must not be called from an interrupt or concurrently on the same SPI bus.
 
@@ -62,21 +63,21 @@ Status values printed by `main.c`:
 | 5 | Invalid ADC response (zero or all ones) |
 
 The MS5611 has no device-ID register. Initialization instead reads all eight
-PROM words and verifies calibration/CRC. A math self-test is independent of
-sensor connectivity and is explicitly labeled as such.
+PROM words and verifies calibration/CRC. The reference calculation tests run
+on the host only; main contains no runtime self-test.
 
 ## On-board verification
 
 1. Build and flash the firmware. CMake lists the new source explicitly; CubeIDE
    should discover it in `Core/Src` when rebuilding its managed project.
 2. Ensure MS5611 **PS is low** (SPI selected), CS is wired to `MS5611_CS`, and
-   power/ground/SPI wiring are correct. SPI2 remains mode 0 with a /32 prescaler.
+   power/ground/SPI wiring are correct. SPI2 uses the CubeMX-generated mode-0
+   configuration without runtime clock or mode overrides.
 3. Set the correct core clock in the debugger's SWV configuration and enable
    ITM stimulus port 0 in the SWV ITM Data Console.
-4. Expect `MS5611 datasheet calculation self-test: PASS`, then
-   `MS5611 initialized, PROM CRC OK`, followed by the six calibration words.
+4. Expect `MS5611 initialized` after successful calibration PROM validation.
 5. Every approximately 500 ms plus conversion time, expect a line like:
-   `MS5611 pressure: 1000.09 mbar, temperature: 20.07 C (D1=..., D2=...)`.
+   `MS5611 pressure: 1000.09 mbar, temperature: 20.07 C`.
    These numbers are illustrative, not a required ambient reading.
 6. Compare pressure against a nearby **absolute/station pressure** reference
    (not sea-level-adjusted weather pressure), and observe temperature changing

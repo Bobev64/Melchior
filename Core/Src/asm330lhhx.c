@@ -15,7 +15,26 @@
 #define ASM330LHHX_CTRL3_C_IF_INC 0x04U
 #define ASM330LHHX_CTRL3_C_SW_RESET 0x01U
 
-#define ASM330LHHX_SPI_TIMEOUT_MS 100U
+static bool valid_config(const ASM330LHHX_Config_t *config)
+{
+    if (!config || !config->spi_timeout_ms || config->spi_timeout_ms == UINT32_MAX) return false;
+    unsigned int accel_odr = (unsigned int)config->accel_odr;
+    unsigned int gyro_odr = (unsigned int)config->gyro_odr;
+    if (accel_odr > 0xA0U || (accel_odr & 0x0FU) ||
+        gyro_odr > 0xA0U || (gyro_odr & 0x0FU)) return false;
+    switch (config->accel_fs) {
+    case ASM330LHHX_XL_FS_2G: case ASM330LHHX_XL_FS_4G:
+    case ASM330LHHX_XL_FS_8G: case ASM330LHHX_XL_FS_16G: break;
+    default: return false;
+    }
+    switch (config->gyro_fs) {
+    case ASM330LHHX_G_FS_125DPS: case ASM330LHHX_G_FS_250DPS:
+    case ASM330LHHX_G_FS_500DPS: case ASM330LHHX_G_FS_1000DPS:
+    case ASM330LHHX_G_FS_2000DPS: case ASM330LHHX_G_FS_4000DPS: break;
+    default: return false;
+    }
+    return true;
+}
 
 static void ASM330LHHX_Select(ASM330LHHX_t *dev)
 {
@@ -65,13 +84,10 @@ void ASM330LHHX_AssignSPI(ASM330LHHX_t *dev,
         return;
     }
 
-    dev->hspi = hspi;
-    dev->cs_port = cs_port;
-    dev->cs_pin = cs_pin;
-    dev->accel_fs = ASM330LHHX_XL_FS_2G;
-    dev->gyro_fs = ASM330LHHX_G_FS_250DPS;
-    dev->accel_mg_per_lsb = ASM330LHHX_AccelSensitivityMg(dev->accel_fs);
-    dev->gyro_mdps_per_lsb = ASM330LHHX_GyroSensitivityMdps(dev->gyro_fs);
+    *dev = (ASM330LHHX_t) {
+        .hspi = hspi, .cs_port = cs_port, .cs_pin = cs_pin,
+        .config = ASM330LHHX_CONFIG_DEFAULT
+    };
 
     if (cs_port != NULL) {
         ASM330LHHX_Deselect(dev);
@@ -88,9 +104,9 @@ HAL_StatusTypeDef ASM330LHHX_ReadRegister(ASM330LHHX_t *dev, uint8_t reg, uint8_
     HAL_StatusTypeDef status;
 
     ASM330LHHX_Select(dev);
-    status = HAL_SPI_Transmit(dev->hspi, &addr, 1U, ASM330LHHX_SPI_TIMEOUT_MS);
+    status = HAL_SPI_Transmit(dev->hspi, &addr, 1U, dev->config.spi_timeout_ms);
     if (status == HAL_OK) {
-        status = HAL_SPI_Receive(dev->hspi, data, len, ASM330LHHX_SPI_TIMEOUT_MS);
+        status = HAL_SPI_Receive(dev->hspi, data, len, dev->config.spi_timeout_ms);
     }
     ASM330LHHX_Deselect(dev);
 
@@ -106,22 +122,19 @@ HAL_StatusTypeDef ASM330LHHX_WriteRegister(ASM330LHHX_t *dev, uint8_t reg, uint8
     uint8_t tx[2] = { reg, value };
 
     ASM330LHHX_Select(dev);
-    HAL_StatusTypeDef status = HAL_SPI_Transmit(dev->hspi, tx, 2U, ASM330LHHX_SPI_TIMEOUT_MS);
+    HAL_StatusTypeDef status = HAL_SPI_Transmit(dev->hspi, tx, 2U, dev->config.spi_timeout_ms);
     ASM330LHHX_Deselect(dev);
 
     return status;
 }
 
-HAL_StatusTypeDef ASM330LHHX_Init(ASM330LHHX_t *dev,
-                                  ASM330LHHX_Odr_t accel_odr,
-                                  ASM330LHHX_AccelFullScale_t accel_fs,
-                                  ASM330LHHX_Odr_t gyro_odr,
-                                  ASM330LHHX_GyroFullScale_t gyro_fs)
+HAL_StatusTypeDef ASM330LHHX_Init(ASM330LHHX_t *dev, const ASM330LHHX_Config_t *config)
 {
-    if (dev == NULL) {
+    if (dev != NULL) dev->initialized = false;
+    if (!dev || !dev->hspi || !dev->cs_port || !dev->cs_pin || !valid_config(config)) {
         return HAL_ERROR;
     }
-
+    dev->config = *config;
     HAL_StatusTypeDef status;
 
     status = ASM330LHHX_WriteRegister(dev, ASM330LHHX_REG_CTRL3_C, ASM330LHHX_CTRL3_C_SW_RESET);
@@ -138,20 +151,19 @@ HAL_StatusTypeDef ASM330LHHX_Init(ASM330LHHX_t *dev,
         return status;
     }
 
-    status = ASM330LHHX_WriteRegister(dev, ASM330LHHX_REG_CTRL1_XL, ((uint8_t)accel_odr | (uint8_t)accel_fs));
+    status = ASM330LHHX_WriteRegister(dev, ASM330LHHX_REG_CTRL1_XL, ((uint8_t)dev->config.accel_odr | (uint8_t)dev->config.accel_fs));
     if (status != HAL_OK) {
         return status;
     }
 
-    status = ASM330LHHX_WriteRegister(dev, ASM330LHHX_REG_CTRL2_G, ((uint8_t)gyro_odr | (uint8_t)gyro_fs));
+    status = ASM330LHHX_WriteRegister(dev, ASM330LHHX_REG_CTRL2_G, ((uint8_t)dev->config.gyro_odr | (uint8_t)dev->config.gyro_fs));
     if (status != HAL_OK) {
         return status;
     }
 
-    dev->accel_fs = accel_fs;
-    dev->gyro_fs = gyro_fs;
-    dev->accel_mg_per_lsb = ASM330LHHX_AccelSensitivityMg(accel_fs);
-    dev->gyro_mdps_per_lsb = ASM330LHHX_GyroSensitivityMdps(gyro_fs);
+    dev->accel_mg_per_lsb = ASM330LHHX_AccelSensitivityMg(dev->config.accel_fs);
+    dev->gyro_mdps_per_lsb = ASM330LHHX_GyroSensitivityMdps(dev->config.gyro_fs);
+    dev->initialized = true;
 
     return HAL_OK;
 }
@@ -163,7 +175,7 @@ HAL_StatusTypeDef ASM330LHHX_ReadDeviceID(ASM330LHHX_t *dev, uint8_t *device_id)
 
 HAL_StatusTypeDef ASM330LHHX_ReadAccelRaw(ASM330LHHX_t *dev, ASM330LHHX_RawData_t *accel)
 {
-    if (accel == NULL) {
+    if (dev == NULL || !dev->initialized || accel == NULL) {
         return HAL_ERROR;
     }
 
@@ -182,7 +194,7 @@ HAL_StatusTypeDef ASM330LHHX_ReadAccelRaw(ASM330LHHX_t *dev, ASM330LHHX_RawData_
 
 HAL_StatusTypeDef ASM330LHHX_ReadGyroRaw(ASM330LHHX_t *dev, ASM330LHHX_RawData_t *gyro)
 {
-    if (gyro == NULL) {
+    if (dev == NULL || !dev->initialized || gyro == NULL) {
         return HAL_ERROR;
     }
 

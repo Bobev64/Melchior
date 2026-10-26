@@ -4,7 +4,7 @@
 ../Core/Src/ms5611.c:46:6:MS5611_AssignSPI	4
 ../Core/Src/ms5611.c:61:9:MS5611_CalculateCRC4	7
 ../Core/Src/ms5611.c:84:13:valid_coefficients	4
-../Core/Src/ms5611.c:94:17:MS5611_Init	8
-../Core/Src/ms5611.c:123:24:convert	5
-../Core/Src/ms5611.c:143:17:MS5611_Compensate	18
-../Core/Src/ms5611.c:183:17:MS5611_Read	6
+../Core/Src/ms5611.c:94:17:MS5611_Init	14
+../Core/Src/ms5611.c:131:24:convert	5
+../Core/Src/ms5611.c:151:17:MS5611_Compensate	18
+../Core/Src/ms5611.c:191:17:MS5611_Read	6
