@@ -85,7 +85,6 @@ static const MS5611_Config_t ms5611_config = {
 
 static uint32_t past_tick = 0U; /* Last IMU attempt; rate-limits failed reads too. */
 static uint32_t attitude_tick = 0U; /* Last valid attitude sample. */
-static uint32_t baro_tick = 0U;
 static bool attitude_initialized = false;
 static float thetaHat_rad = 0.0f;
 static float phiHat_rad = 0.0f;
@@ -359,12 +358,12 @@ int main(void)
       if (accel_status == HAL_OK && gyro_status == HAL_OK) {
         /* Application axis remap: X <- sensor Y, Y <- sensor X; Z unchanged.
            This literal swap is a reflection, not a right-handed mounting rotation. */
-        float sensor_accel_x = accel.x;
-        accel.x = accel.y;
-        accel.y = sensor_accel_x;
-        float sensor_gyro_x = gyro.x;
-        gyro.x = gyro.y;
-        gyro.y = sensor_gyro_x;
+        // float sensor_accel_x = accel.x;
+        // accel.x = accel.y;
+        // accel.y = sensor_accel_x;
+        // float sensor_gyro_x = gyro.x;
+        // gyro.x = gyro.y;
+        // gyro.y = sensor_gyro_x;
 
         uint32_t now = HAL_GetTick();
         float dt = (now - attitude_tick) * 0.001f;
@@ -564,7 +563,7 @@ static void MX_OCTOSPI1_Init(void)
   hxspi1.Init.FreeRunningClock = HAL_XSPI_FREERUNCLK_DISABLE;
   hxspi1.Init.ClockMode = HAL_XSPI_CLOCK_MODE_0;
   hxspi1.Init.WrapSize = HAL_XSPI_WRAP_NOT_SUPPORTED;
-  hxspi1.Init.ClockPrescaler = 63;
+  hxspi1.Init.ClockPrescaler = 16;
   hxspi1.Init.SampleShifting = HAL_XSPI_SAMPLE_SHIFT_NONE;
   hxspi1.Init.DelayHoldQuarterCycle = HAL_XSPI_DHQC_DISABLE;
   hxspi1.Init.ChipSelectBoundary = HAL_XSPI_BONDARYOF_NONE;
@@ -774,6 +773,12 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(ADXL_CS_GPIO_Port, ADXL_CS_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin : PA0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : D1_LED_Pin D2_LED_Pin MAG_CS_Pin ASM330_CS_Pin
                            MS5611_CS_Pin */

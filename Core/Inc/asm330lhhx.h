@@ -61,8 +61,8 @@ typedef struct {
     uint32_t spi_timeout_ms;
 } ASM330LHHX_Config_t;
 
-#define ASM330LHHX_CONFIG_DEFAULT { ASM330LHHX_ODR_104, ASM330LHHX_XL_FS_2G, \
-                                   ASM330LHHX_ODR_104, ASM330LHHX_G_FS_250DPS, 100U }
+#define ASM330LHHX_CONFIG_DEFAULT { ASM330LHHX_ODR_104, ASM330LHHX_XL_FS_16G, \
+                                   ASM330LHHX_ODR_104, ASM330LHHX_G_FS_2000DPS, 100U }
 
 typedef struct {
     SPI_HandleTypeDef *hspi;
@@ -87,6 +87,7 @@ HAL_StatusTypeDef ASM330LHHX_Init(ASM330LHHX_t *dev, const ASM330LHHX_Config_t *
 HAL_StatusTypeDef ASM330LHHX_ReadDeviceID(ASM330LHHX_t *dev, uint8_t *device_id);
 HAL_StatusTypeDef ASM330LHHX_ReadAccelRaw(ASM330LHHX_t *dev, ASM330LHHX_RawData_t *accel);
 HAL_StatusTypeDef ASM330LHHX_ReadGyroRaw(ASM330LHHX_t *dev, ASM330LHHX_RawData_t *gyro);
+HAL_StatusTypeDef ASM330LHHX_ReadGyroAccelRaw(ASM330LHHX_t *dev, ASM330LHHX_RawData_t *gyro, ASM330LHHX_RawData_t *accel);
 HAL_StatusTypeDef ASM330LHHX_ReadAccelMg(ASM330LHHX_t *dev, ASM330LHHX_FloatData_t *accel_mg);
 HAL_StatusTypeDef ASM330LHHX_ReadGyroMdps(ASM330LHHX_t *dev, ASM330LHHX_FloatData_t *gyro_mdps);
 HAL_StatusTypeDef ASM330LHHX_ReadRegister(ASM330LHHX_t *dev, uint8_t reg, uint8_t *data, uint16_t len);

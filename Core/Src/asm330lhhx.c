@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 
+static void remap(ASM330LHHX_RawData_t *data);
+
 #define ASM330LHHX_SPI_READ_BIT 0x80U
 
 #define ASM330LHHX_REG_WHO_AM_I 0x0FU
@@ -189,6 +191,8 @@ HAL_StatusTypeDef ASM330LHHX_ReadAccelRaw(ASM330LHHX_t *dev, ASM330LHHX_RawData_
     accel->y = ASM330LHHX_Int16FromLe(&bytes[2]);
     accel->z = ASM330LHHX_Int16FromLe(&bytes[4]);
 
+    remap(accel);
+
     return HAL_OK;
 }
 
@@ -207,6 +211,38 @@ HAL_StatusTypeDef ASM330LHHX_ReadGyroRaw(ASM330LHHX_t *dev, ASM330LHHX_RawData_t
     gyro->x = ASM330LHHX_Int16FromLe(&bytes[0]);
     gyro->y = ASM330LHHX_Int16FromLe(&bytes[2]);
     gyro->z = ASM330LHHX_Int16FromLe(&bytes[4]);
+
+    remap(gyro);
+
+
+    return HAL_OK;
+}
+
+HAL_StatusTypeDef ASM330LHHX_ReadGyroAccelRaw(ASM330LHHX_t *dev, ASM330LHHX_RawData_t *gyro, ASM330LHHX_RawData_t *accel)
+{
+
+    if (dev == NULL || !dev->initialized || accel == NULL || gyro == NULL || gyro == accel){
+        return HAL_ERROR;
+    }
+
+    uint8_t bytes[12];
+
+    HAL_StatusTypeDef status = ASM330LHHX_ReadRegister(dev, ASM330LHHX_REG_OUTX_L_G, bytes, sizeof(bytes));
+    if (status != HAL_OK){
+        return status;
+    }
+
+
+    gyro->x = ASM330LHHX_Int16FromLe(&bytes[0]);
+    gyro->y = ASM330LHHX_Int16FromLe(&bytes[2]);
+    gyro->z = ASM330LHHX_Int16FromLe(&bytes[4]);
+
+    accel->x = ASM330LHHX_Int16FromLe(&bytes[6]);
+    accel->y = ASM330LHHX_Int16FromLe(&bytes[8]);
+    accel->z = ASM330LHHX_Int16FromLe(&bytes[10]);
+    
+    remap(accel);
+    remap(gyro);
 
     return HAL_OK;
 }
@@ -247,4 +283,17 @@ HAL_StatusTypeDef ASM330LHHX_ReadGyroMdps(ASM330LHHX_t *dev, ASM330LHHX_FloatDat
     gyro_mdps->z = (float)raw.z * dev->gyro_mdps_per_lsb;
 
     return HAL_OK;
+}
+
+
+static void remap(ASM330LHHX_RawData_t *data){
+    
+    int16_t x = data->x;
+    int16_t y = data->y;
+    int16_t z = data->z;
+
+    // NOTE: Change mappings depending on board
+    data->x = y * 1;
+    data->y = x * -1;
+    data->z = z * 1;
 }
